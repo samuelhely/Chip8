@@ -60,6 +60,219 @@ void InitializeEmulator() {
     }
 }
 
+// NOTE(samuel): Clear the display
+void Opcode_00E0() 
+{
+    for(uint8 ScreenIndex = 0; ScreenIndex < ArrayCount(Display); ScreenIndex++)
+    {
+        Display[ScreenIndex] = 0;
+    }
+}
+
+// NOTE(samuel): Return from a subroutine
+void Opcode_00EE() 
+{
+    ProgramCounter = Stack[StackPointer];
+    StackPointer--;
+}
+
+// NOTE(samuel): Jump to location nnn
+void Opcode_1NNN()
+{
+    uint16 Address = OpCode & 0x0FFF;
+    ProgramCounter = Address;
+}
+
+// NOTE(samuel): Call subroutine at nnn
+void Opcode_2NNN()
+{
+    Stack[StackPointer] = ProgramCounter;
+    
+    uint16 Address = OpCode & 0x0FFF;
+    ProgramCounter = Address;
+}
+
+// NOTE(samuel): Skip conditionally
+void Opcode_3XKK()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 Value = OpCode & 0x00FF;
+
+    if(Registers[VX] == Value)
+    {
+        ProgramCounter += 2;
+    }
+}
+
+// NOTE(samuel): Skip conditionally
+void Opcode_4XKK()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 Value = OpCode & 0x00FF;
+
+    if(Registers[VX] != Value)
+    {
+        ProgramCounter += 2;
+    }
+}
+
+// NOTE(samuel): Skip conditionally
+void Opcode_5XY0()
+{
+    uint16 VX = (OpCode & 0x0F00) >> 8;
+    uint16 VY = (OpCode & 0x00F0) >> 4;;
+
+    if(Registers[VX] == Registers[VY])
+    {
+        ProgramCounter += 2;
+    }
+}
+
+void Opcode_6XKK()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 Value = OpCode & 0x00FF;
+
+    Registers[VX] = Value;
+}
+
+void Opcode_7XKK()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 Value = OpCode & 0x00FF;
+
+    Registers[VX] += Value;
+}
+
+void Opcode_8XY0()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    Registers[VX] = Registers[VY];
+}
+
+void Opcode_8XY1()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    Registers[VX] = (Registers[VX] | Registers[VY]);
+}
+
+void Opcode_8XY2()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    Registers[VX] = (Registers[VX] & Registers[VY]);
+}
+
+void Opcode_8XY3()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    Registers[VX] = (Registers[VX] ^ Registers[VY]);
+}
+
+void Opcode_8XY4()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    Registers[VX] = Registers[VX] + Registers[VY];
+    if(Registers[VX] > 0xFF)
+    {
+        Registers[0xF] = 1;
+    }
+    else
+    {
+        Registers[0xF] = 0;
+    }
+}
+
+void Opcode_8XY5()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    if(Registers[VX] > Registers[VY])
+    {
+        Registers[0xF] = 1;
+    }
+    else
+    {
+        Registers[0xF] = 0;
+    }
+
+    Registers[VX] = Registers[VX] - Registers[VY];
+}
+
+void Opcode_8XY6()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+    uint8 Value = Registers[VX] & 0x1;
+
+    if(Value == 1)
+    {
+        Registers[0xF] = 1;
+    }
+    else
+    {
+        Registers[0xF] = 0;
+    }
+
+    Registers[VX] = Registers[VX] >> 1;
+}
+
+void Opcode_8XY7()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    if(Registers[VY] > Registers[VX])
+    {
+        Registers[0xF] = 1;
+    }
+    else
+    {
+        Registers[0xF] = 0;
+    }
+
+    Registers[VX] = Registers[VY] - Registers[VX];
+}
+
+void Opcode_8XYE()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+    uint8 Value = (Registers[VX] & (0x1 << 7));
+
+    if(Value == 1)
+    {
+        Registers[0xF] = 1;
+    }
+    else
+    {
+        Registers[0xF] = 0;
+    }
+
+    Registers[VX] = Registers[VX] << 1;
+}
+
+void Opcode_9XY0()
+{
+    uint8 VX = (OpCode & 0x0F00) >> 8;
+    uint8 VY = (OpCode & 0x00F0) >> 4;
+
+    if(Registers[VX] != Registers[VY])
+    {
+        ProgramCounter += 2;
+    }
+}
+
 int main(int ArgCount, char **ArgValues)
 {
     InitializeEmulator();
@@ -76,6 +289,5 @@ int main(int ArgCount, char **ArgValues)
         }
     }
 
-    printf("HI");
     return 0;
 }
