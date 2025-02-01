@@ -35,7 +35,8 @@ uint8 Keypad[16] = {};
 
 uint8 Display[DISPLAY_WIDTH*DISPLAY_HEIGHT] = {};
 
-uint8_t Font[] = {
+uint8 FontStartAddress = 0x50;
+uint8 Font[] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -62,7 +63,7 @@ void InitializeEmulator() {
     DelayTimer = 0;
     SoundTimer = 0;
 
-    uint8 MemoryIndex = 80;
+    uint8 MemoryIndex = FontStartAddress;
     for(int32 Index = 0; Index < ArrayCount(Font); Index++)
     {
         Memory[MemoryIndex++] = Font[Index];
@@ -336,6 +337,107 @@ void Opcode_DXYN()
     }
 }
 
+void Opcode_EX9E()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+    
+    if(Keypad[VX] == 1)
+    {
+        ProgramCounter += 2;
+    }
+}
+
+void Opcode_EXA1()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+    
+    if(Keypad[VX] == 0)
+    {
+        ProgramCounter += 2;
+    }
+}
+
+void Opcode_FX07()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    Registers[VX] = DelayTimer;
+}
+
+void Opcode_FX0A()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    for(uint8 KeypadIndex = 0; KeypadIndex < ArrayCount(Keypad); KeypadIndex++)
+    {
+        if(Keypad[KeypadIndex] == 1)
+        {
+            Registers[VX] = KeypadIndex;
+            return;
+        }
+    }
+
+    ProgramCounter -= 2;
+}
+
+void Opcode_FX15()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    DelayTimer = Registers[VX];
+}
+
+void Opcode_FX18()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    SoundTimer = Registers[VX];
+}
+
+void Opcode_FX1E()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    Memory[IndexRegister] += Registers[VX];
+}
+
+void Opcode_FX29()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+
+    IndexRegister = (uint8)(FontStartAddress + Registers[VX]);
+}
+
+void Opcode_FX33()
+{
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+    uint8 Value = Registers[VX];
+
+    Memory[IndexRegister + 2] = (uint8)(Value % 10);
+    Value /= 10;
+    
+    Memory[IndexRegister + 1] = (uint8)(Value % 10);
+    Value /= 10;
+    
+    Memory[IndexRegister] = (uint8)(Value % 10);
+}
+
+void Opcode_FX55()
+{
+    for(uint8 RegisterIndex = 0; RegisterIndex < ArrayCount(Registers); RegisterIndex++)
+    {
+        Memory[IndexRegister + RegisterIndex] = Registers[RegisterIndex];
+    }
+}
+
+void Opcode_FX65()
+{
+    for(uint8 RegisterIndex = 0; RegisterIndex < ArrayCount(Registers); RegisterIndex++)
+    {
+         Registers[RegisterIndex] = Memory[IndexRegister + RegisterIndex];
+    }
+}
+
 int main(int ArgCount, char **ArgValues)
 {
     InitializeEmulator();
@@ -354,6 +456,32 @@ int main(int ArgCount, char **ArgValues)
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Chip8");
     while(!WindowShouldClose())
     {
+        // Input
+        Keypad[0] = IsKeyPressed(KEY_ONE);
+        Keypad[1] = IsKeyPressed(KEY_TWO);
+        Keypad[2] = IsKeyPressed(KEY_THREE);
+        Keypad[3] = IsKeyPressed(KEY_FOUR);
+        Keypad[4] = IsKeyPressed(KEY_Q);
+        Keypad[5] = IsKeyPressed(KEY_W);
+        Keypad[6] = IsKeyPressed(KEY_E);
+        Keypad[7] = IsKeyPressed(KEY_R);
+        Keypad[8] = IsKeyPressed(KEY_A);
+        Keypad[9] = IsKeyPressed(KEY_S);
+        Keypad[10] = IsKeyPressed(KEY_D);
+        Keypad[11] = IsKeyPressed(KEY_F);
+        Keypad[12] = IsKeyPressed(KEY_Z);
+        Keypad[13] = IsKeyPressed(KEY_X);
+        Keypad[14] = IsKeyPressed(KEY_C);
+        Keypad[15] = IsKeyPressed(KEY_V);
+
+        for(uint8 KeyIndex = 0; KeyIndex < ArrayCount(Keypad); KeyIndex++)
+        {
+            if(Keypad[KeyIndex])
+            {
+                TraceLog(LOG_WARNING, "Key %d is pressed", KeyIndex);
+            }
+        }
+
         // Fetching
         OpCode = (uint16)(((uint16)Memory[ProgramCounter] << 8) | Memory[ProgramCounter + 1]);
         if(OpCode)
