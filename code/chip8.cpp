@@ -1,5 +1,8 @@
 #include "raylib.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -19,8 +22,8 @@ typedef int32_t int32;
 
 #define DISPLAY_WIDTH 64
 #define DISPLAY_HEIGHT 32
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 320
+#define WINDOW_WIDTH 960
+#define WINDOW_HEIGHT 540
 
 uint8 Memory[Kilobytes(4)];
 uint16 Stack[16] = {};
@@ -490,24 +493,7 @@ int main(int ArgCount, char **ArgValues)
         }
         
         BeginDrawing();
-        ClearBackground(RAYWHITE);
-
-        for(int32 Y = 0; Y < DISPLAY_HEIGHT; Y++)
-        {
-            for(int32 X = 0; X < DISPLAY_WIDTH; X++)
-            {
-                uint8 Pixel = Display[Y*DISPLAY_WIDTH + X];
-                if(Pixel)
-                {
-                    DrawPixel(X, Y, RED);
-                    //TraceLog(LOG_WARNING, "X:%d-Y:%d", X, Y);
-                }
-                else
-                {
-                    DrawPixel(X, Y, BLACK);
-                }
-            }
-        }
+        ClearBackground(GRAY);
 
         switch(OpCode & 0xF000)
         {
@@ -516,7 +502,7 @@ int main(int ArgCount, char **ArgValues)
                 if(OpCode == 0x00E0)
                 {
                     TraceLog(LOG_WARNING, "Clear the screen");
-                    //Opcode_00E0();
+                    Opcode_00E0();
                 }
                 else if(OpCode == 0x00EE)
                 {
@@ -528,16 +514,19 @@ int main(int ArgCount, char **ArgValues)
             case 0x1000 :
             {
                 TraceLog(LOG_WARNING, "Jump to address");
+                Opcode_1NNN();
             } break;
 
             case 0x2000 :
             {
                 TraceLog(LOG_WARNING, "Call at address");
+                Opcode_2NNN();
             } break;
 
             case 0x3000 :
             {
                 TraceLog(LOG_WARNING, "Skip");
+                Opcode_3XKK();
             } break;
 
             case 0x4000 :
@@ -549,6 +538,7 @@ int main(int ArgCount, char **ArgValues)
             case 0x5000 :
             {
                 TraceLog(LOG_WARNING, "Instruction 5");
+                Opcode_5XY0();
             } break;
 
             case 0x6000 :
@@ -565,7 +555,6 @@ int main(int ArgCount, char **ArgValues)
 
             case 0x8000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 8");
                 switch(OpCode & 0x000F)
                 {
                     case 0x0000 :
@@ -627,6 +616,7 @@ int main(int ArgCount, char **ArgValues)
             case 0x9000 :
             {
                 TraceLog(LOG_WARNING, "Instruction 9");
+                Opcode_7XKK();
             } break;
 
             case 0xA000 :
@@ -638,11 +628,13 @@ int main(int ArgCount, char **ArgValues)
             case 0xB000 :
             {
                 TraceLog(LOG_WARNING, "Instruction B");
+                Opcode_BNNN();
             } break;
 
             case 0xC000 :
             {
                 TraceLog(LOG_WARNING, "Instruction C");
+                Opcode_CXKK();
             } break;
 
             case 0xD000 :
@@ -653,14 +645,174 @@ int main(int ArgCount, char **ArgValues)
 
             case 0xE000 :
             {
-                TraceLog(LOG_WARNING, "Instruction E");
+                switch(OpCode & 0x000F)
+                {
+                    case 0x000E :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction E-E");
+                        Opcode_EX9E();
+                    } break;
+                    
+                    case 0x0001 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction E-1");
+                        Opcode_EXA1();
+                    } break;
+                }
             } break;
 
             case 0xF000 :
             {
-                TraceLog(LOG_WARNING, "Instruction F");
+                switch(OpCode & 0x00FF)
+                {
+                    case 0x0007 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-07");
+                        Opcode_FX07();
+                    } break;
+
+                    case 0x000A :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-0A");
+                        Opcode_FX0A();
+                    } break;
+
+                    case 0x0015 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-15");
+                        Opcode_FX15();
+                    } break;
+
+                    case 0x0018 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-18");
+                        Opcode_FX18();
+                    } break;
+
+                    case 0x001E :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-1E");
+                        Opcode_FX1E();
+                    } break;
+
+                    case 0x0029 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-29");
+                        Opcode_FX29();
+                    } break;
+
+                    case 0x0033 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-33");
+                        Opcode_FX33();
+                    } break;
+
+                    case 0x0055 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-55");
+                        Opcode_FX55();
+                    } break;
+
+                    case 0x0065 :
+                    {
+                        TraceLog(LOG_WARNING, "Instruction F-65");
+                        Opcode_FX65();
+                    } break;
+
+                }
             } break;
         }
+
+        //DrawRectangle(0, 0, 320, 160, RED);
+
+        int32 PixelSize = 10;
+        for(int32 Y = 0; Y < DISPLAY_HEIGHT; Y++)
+        {
+            for(int32 X = 0; X < DISPLAY_WIDTH; X++)
+            {
+                uint8 Value = Display[Y*DISPLAY_WIDTH + X];
+                Color Pixel = BLACK;
+                if(Value)
+                {
+                    Pixel = RED;
+                }
+                    
+                int32 MinX = X * PixelSize;
+                int32 MinY = Y * PixelSize;
+                int32 MaxX = MinX + PixelSize;
+                int32 MaxY = MinY + PixelSize;
+                DrawRectangle(MinX, MinY, MaxX, MaxY, Pixel);
+            }
+        }
+
+        // Right Column
+        int32 PosX = DISPLAY_WIDTH*PixelSize;
+        int32 PosY = 0;
+        DrawRectangle(PosX, PosY, WINDOW_WIDTH, WINDOW_HEIGHT, RAYWHITE);
+
+        int32 RectSize = 30;
+        DrawText("Registers", PosX + 10, 10, 14, BLACK);
+#if 0
+        for(int32 Y = 0; Y < ArrayCount(Registers); Y++)
+        {
+            int32 MinY = Y * RectSize;
+            int32 MaxY = MinY + RectSize;
+            DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        }
+        int32 Y = 0;
+        int32 MinY = Y * RectSize;
+        int32 MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+        Y++;
+        MinY = Y * RectSize;
+        MaxY = MinY + RectSize;
+        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
+#endif
+
+        // Bottom Area
+        DrawRectangle(0, DISPLAY_HEIGHT*PixelSize, DISPLAY_WIDTH*PixelSize, WINDOW_HEIGHT, Color{255, 0, 255, 100});
+
+        ClearBackground(RAYWHITE);
 
         EndDrawing();
     }
