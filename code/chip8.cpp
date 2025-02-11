@@ -85,8 +85,14 @@ void Opcode_00E0()
 // NOTE(samuel): Return from a subroutine
 void Opcode_00EE() 
 {
-    ProgramCounter = Stack[StackPointer];
     StackPointer--;
+
+    if(StackPointer < 0)
+    {
+        TraceLog(LOG_WARNING, "Stack underflow");
+    }
+
+    ProgramCounter = Stack[StackPointer];
 }
 
 // NOTE(samuel): Jump to location nnn
@@ -100,13 +106,19 @@ void Opcode_1NNN()
 void Opcode_2NNN()
 {
     Stack[StackPointer] = ProgramCounter;
+    StackPointer++;
+
+    if(StackPointer > ArrayCount(Stack))
+    {
+        TraceLog(LOG_WARNING, "Stack overflow");
+    }
     
     uint16 Address = (uint16)(OpCode & 0x0FFF);
     ProgramCounter = Address;
 }
 
 // NOTE(samuel): Skip conditionally
-void Opcode_3XKK()
+void Opcode_3XNN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Value = (uint8)(OpCode & 0x00FF);
@@ -118,7 +130,7 @@ void Opcode_3XKK()
 }
 
 // NOTE(samuel): Skip conditionally
-void Opcode_4XKK()
+void Opcode_4XNN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Value = (uint8)(OpCode & 0x00FF);
@@ -141,7 +153,7 @@ void Opcode_5XY0()
     }
 }
 
-void Opcode_6XKK()
+void Opcode_6XNN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Value = (uint8)(OpCode & 0x00FF);
@@ -149,7 +161,7 @@ void Opcode_6XKK()
     Registers[VX] = Value;
 }
 
-void Opcode_7XKK()
+void Opcode_7XNN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Value = (uint8)(OpCode & 0x00FF);
@@ -170,7 +182,7 @@ void Opcode_8XY1()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    Registers[VX] = (uint8)(Registers[VX] | Registers[VY]);
+    Registers[VX] |= Registers[VY];
 }
 
 void Opcode_8XY2()
@@ -178,7 +190,7 @@ void Opcode_8XY2()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    Registers[VX] = (uint8)(Registers[VX] & Registers[VY]);
+    Registers[VX] &= Registers[VY];
 }
 
 void Opcode_8XY3()
@@ -186,7 +198,7 @@ void Opcode_8XY3()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    Registers[VX] = (uint8)(Registers[VX] ^ Registers[VY]);
+    Registers[VX] ^= Registers[VY];
 }
 
 void Opcode_8XY4()
@@ -194,16 +206,9 @@ void Opcode_8XY4()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    int16 Result = (int16)(Registers[VX] + Registers[VY]);
-    Registers[VX] = (uint8)(Result);
-    if(Result > 0xFF)
-    {
-        Registers[0xF] = 1;
-    }
-    else
-    {
-        Registers[0xF] = 0;
-    }
+    uint8 Flag = ((Registers[VX] + Registers[VY]) > 0xFF);
+    Registers[VX] += Registers[VY];
+    Registers[0xF] = Flag;
 }
 
 void Opcode_8XY5()
@@ -211,34 +216,21 @@ void Opcode_8XY5()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    if(Registers[VX] > Registers[VY])
-    {
-        Registers[0xF] = 1;
-    }
-    else
-    {
-        Registers[0xF] = 0;
-    }
-
-    Registers[VX] = (uint8)(Registers[VX] - Registers[VY]);
+    uint8 Flag = (Registers[VX] >= Registers[VY]);
+    Registers[VX] -= Registers[VY];
+    Registers[0xF] = Flag;
 }
 
 void Opcode_8XY6()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
-    uint8 Value = (uint8)(Registers[VX] & 0x1);
 
-    if(Value == 1)
-    {
-        Registers[0xF] = 1;
-    }
-    else
-    {
-        Registers[0xF] = 0;
-    }
+    //Registers[VX] = Registers[VY];
+    uint8 Value = (uint8)((Registers[VX] & 0x1) > 0);
 
-    Registers[VX] = (uint8)(Registers[VX] >> 1);
+    Registers[VX] = Registers[VY] >> 1;
+    Registers[0xF] = Value;
 }
 
 void Opcode_8XY7()
@@ -246,34 +238,21 @@ void Opcode_8XY7()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
 
-    if(Registers[VY] > Registers[VX])
-    {
-        Registers[0xF] = 1;
-    }
-    else
-    {
-        Registers[0xF] = 0;
-    }
-
-    Registers[VX] = (uint8)(Registers[VY] - Registers[VX]);
+    uint8 Flag = (Registers[VY] >= Registers[VX]);
+    Registers[VX] = (Registers[VY] - Registers[VX]);
+    Registers[0xF] = Flag;
 }
 
 void Opcode_8XYE()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
-    uint8 Value = (uint8)(Registers[VX] & (0x1 << 7));
 
-    if(Value == 1)
-    {
-        Registers[0xF] = 1;
-    }
-    else
-    {
-        Registers[0xF] = 0;
-    }
+    //Registers[VX] = Registers[VY];
+    uint8 Value = (uint8)((Registers[VX] & (0x1 << 7)) > 0);
 
-    Registers[VX] = (uint8)(Registers[VX] << 1);
+    Registers[VX] = Registers[VY] << 1;
+    Registers[0xF] = Value;
 }
 
 void Opcode_9XY0()
@@ -299,7 +278,7 @@ void Opcode_BNNN()
     ProgramCounter = (uint16)(Value + Registers[0]);
 }
 
-void Opcode_CXKK()
+void Opcode_CXNN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Rand = (uint8)rand();
@@ -312,29 +291,29 @@ void Opcode_DXYN()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 VY = (uint8)((OpCode & 0x00F0) >> 4);
-    uint8 Rows = (uint8)(OpCode & 0x000F);
+    uint8 Count = (uint8)(OpCode & 0x000F);
 
     uint8 PosX = Registers[VX];
     uint8 PosY = Registers[VY];
 
     Registers[0xF] = 0;
 
-    for(uint8 Y = 0; Y < Rows; Y++)
+    for(uint32 Row = 0; Row < Count; Row++)
     {
-        uint8 Sprite = Memory[IndexRegister + Y];
+        uint32 Sprite = Memory[IndexRegister + Row];
 
-        for(uint8 X = 0; X < 8; X++)
+        for(uint32 Column = 0; Column < 8; Column++)
         {
-            uint8 Pixel = (uint8)(Sprite & (0x80 >> X));
-            uint8 *Value = &Display[(PosY + Y)*DISPLAY_WIDTH + (PosX + X)];
+            uint32 Pixel = (Sprite & (0x80 >> Column));
+            uint8 *DisplayValue = &Display[(Row + PosY)*DISPLAY_WIDTH + (Column + PosX)];
             if(Pixel != 0)
             {
-                if(*Value == 1)
+                if(*DisplayValue == 1)
                 {
                     Registers[0xF] = 1;
                 }
                 
-                *Value ^= 1;
+                *DisplayValue ^= 1;
             }
         }
     }
@@ -401,7 +380,12 @@ void Opcode_FX1E()
 {
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
 
-    Memory[IndexRegister] += Registers[VX];
+    if((IndexRegister + Registers[VX]) > 0xFFF)
+    {
+        Registers[0xF] = 1;
+    }
+
+    IndexRegister += Registers[VX];
 }
 
 void Opcode_FX29()
@@ -416,29 +400,29 @@ void Opcode_FX33()
     uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
     uint8 Value = Registers[VX];
 
+    Memory[IndexRegister + 0] = (uint8)(Value / 100);
+    Memory[IndexRegister + 1] = (uint8)((Value / 10) % 10);
     Memory[IndexRegister + 2] = (uint8)(Value % 10);
-    Value /= 10;
-    
-    Memory[IndexRegister + 1] = (uint8)(Value % 10);
-    Value /= 10;
-    
-    Memory[IndexRegister] = (uint8)(Value % 10);
 }
 
 void Opcode_FX55()
 {
-    for(uint8 RegisterIndex = 0; RegisterIndex < ArrayCount(Registers); RegisterIndex++)
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+    for(uint8 Index = 0; Index <= VX; Index++)
     {
-        Memory[IndexRegister + RegisterIndex] = Registers[RegisterIndex];
+        Memory[IndexRegister + Index] = Registers[Index];
     }
+    //IndexRegister++;
 }
 
 void Opcode_FX65()
 {
-    for(uint8 RegisterIndex = 0; RegisterIndex < ArrayCount(Registers); RegisterIndex++)
+    uint8 VX = (uint8)((OpCode & 0x0F00) >> 8);
+    for(uint8 Index = 0; Index <= VX; Index++)
     {
-         Registers[RegisterIndex] = Memory[IndexRegister + RegisterIndex];
+        Registers[Index] = Memory[IndexRegister + Index];
     }
+    //IndexRegister++;
 }
 
 int main(int ArgCount, char **ArgValues)
@@ -501,56 +485,56 @@ int main(int ArgCount, char **ArgValues)
             {
                 if(OpCode == 0x00E0)
                 {
-                    TraceLog(LOG_WARNING, "Clear the screen");
+                    //TraceLog(LOG_WARNING, "Clear the screen");
                     Opcode_00E0();
                 }
                 else if(OpCode == 0x00EE)
                 {
-                    TraceLog(LOG_WARNING, "Return from subroutine");
+                    //TraceLog(LOG_WARNING, "Return from subroutine");
                     Opcode_00EE();
                 }
             } break;
 
             case 0x1000 :
             {
-                TraceLog(LOG_WARNING, "Jump to address");
+                //TraceLog(LOG_WARNING, "Jump to address");
                 Opcode_1NNN();
             } break;
 
             case 0x2000 :
             {
-                TraceLog(LOG_WARNING, "Call at address");
+                //TraceLog(LOG_WARNING, "Call at address");
                 Opcode_2NNN();
             } break;
 
             case 0x3000 :
             {
-                TraceLog(LOG_WARNING, "Skip");
-                Opcode_3XKK();
+                //TraceLog(LOG_WARNING, "Skip");
+                Opcode_3XNN();
             } break;
 
             case 0x4000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 4");
-                Opcode_4XKK();
+                //TraceLog(LOG_WARNING, "Instruction 4");
+                Opcode_4XNN();
             } break;
 
             case 0x5000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 5");
+                //TraceLog(LOG_WARNING, "Instruction 5");
                 Opcode_5XY0();
             } break;
 
             case 0x6000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 6");
-                Opcode_6XKK();
+                //TraceLog(LOG_WARNING, "Instruction 6");
+                Opcode_6XNN();
             } break;
 
             case 0x7000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 7");
-                Opcode_7XKK();
+                //TraceLog(LOG_WARNING, "Instruction 7");
+                Opcode_7XNN();
             } break;
 
             case 0x8000 :
@@ -559,55 +543,55 @@ int main(int ArgCount, char **ArgValues)
                 {
                     case 0x0000 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-0");
+                        //TraceLog(LOG_WARNING, "Instruction 8-0");
                         Opcode_8XY0();
                     } break;
                     
                     case 0x0001 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-1");
+                        //TraceLog(LOG_WARNING, "Instruction 8-1");
                         Opcode_8XY1();
                     } break;
                     
                     case 0x0002 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-2");
+                        //TraceLog(LOG_WARNING, "Instruction 8-2");
                         Opcode_8XY2();
                     } break;
                     
                     case 0x0003 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-3");
+                        //TraceLog(LOG_WARNING, "Instruction 8-3");
                         Opcode_8XY3();
                     } break;
                     
                     case 0x0004 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-4");
+                        //TraceLog(LOG_WARNING, "Instruction 8-4");
                         Opcode_8XY4();
                     } break;
                     
                     case 0x0005 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-5");
+                        //TraceLog(LOG_WARNING, "Instruction 8-5");
                         Opcode_8XY5();
                     } break;
                     
                     case 0x0006 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-6");
+                        //TraceLog(LOG_WARNING, "Instruction 8-6");
                         Opcode_8XY6();
                     } break;
                     
                     case 0x0007 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-7");
+                        //TraceLog(LOG_WARNING, "Instruction 8-7");
                         Opcode_8XY7();
                     } break;
                     
                     case 0x000E :
                     {
-                        TraceLog(LOG_WARNING, "Instruction 8-E");
+                        //TraceLog(LOG_WARNING, "Instruction 8-E");
                         Opcode_8XYE();
                     } break;
                 }
@@ -615,31 +599,31 @@ int main(int ArgCount, char **ArgValues)
 
             case 0x9000 :
             {
-                TraceLog(LOG_WARNING, "Instruction 9");
-                Opcode_7XKK();
+                //TraceLog(LOG_WARNING, "Instruction 9");
+                Opcode_9XY0();
             } break;
 
             case 0xA000 :
             {
-                TraceLog(LOG_WARNING, "Instruction A");
+                //TraceLog(LOG_WARNING, "Instruction A");
                 Opcode_ANNN();
             } break;
 
             case 0xB000 :
             {
-                TraceLog(LOG_WARNING, "Instruction B");
+                //TraceLog(LOG_WARNING, "Instruction B");
                 Opcode_BNNN();
             } break;
 
             case 0xC000 :
             {
-                TraceLog(LOG_WARNING, "Instruction C");
-                Opcode_CXKK();
+                //TraceLog(LOG_WARNING, "Instruction C");
+                Opcode_CXNN();
             } break;
 
             case 0xD000 :
             {
-                TraceLog(LOG_WARNING, "Instruction D");
+                //TraceLog(LOG_WARNING, "Instruction D");
                 Opcode_DXYN();
             } break;
 
@@ -649,13 +633,13 @@ int main(int ArgCount, char **ArgValues)
                 {
                     case 0x000E :
                     {
-                        TraceLog(LOG_WARNING, "Instruction E-E");
+                        //TraceLog(LOG_WARNING, "Instruction E-E");
                         Opcode_EX9E();
                     } break;
                     
                     case 0x0001 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction E-1");
+                        //TraceLog(LOG_WARNING, "Instruction E-1");
                         Opcode_EXA1();
                     } break;
                 }
@@ -667,55 +651,55 @@ int main(int ArgCount, char **ArgValues)
                 {
                     case 0x0007 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-07");
+                        //TraceLog(LOG_WARNING, "Instruction F-07");
                         Opcode_FX07();
                     } break;
 
                     case 0x000A :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-0A");
+                        //TraceLog(LOG_WARNING, "Instruction F-0A");
                         Opcode_FX0A();
                     } break;
 
                     case 0x0015 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-15");
+                        //TraceLog(LOG_WARNING, "Instruction F-15");
                         Opcode_FX15();
                     } break;
 
                     case 0x0018 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-18");
+                        //TraceLog(LOG_WARNING, "Instruction F-18");
                         Opcode_FX18();
                     } break;
 
                     case 0x001E :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-1E");
+                        //TraceLog(LOG_WARNING, "Instruction F-1E");
                         Opcode_FX1E();
                     } break;
 
                     case 0x0029 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-29");
+                        //TraceLog(LOG_WARNING, "Instruction F-29");
                         Opcode_FX29();
                     } break;
 
                     case 0x0033 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-33");
+                        //TraceLog(LOG_WARNING, "Instruction F-33");
                         Opcode_FX33();
                     } break;
 
                     case 0x0055 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-55");
+                        //TraceLog(LOG_WARNING, "Instruction F-55");
                         Opcode_FX55();
                     } break;
 
                     case 0x0065 :
                     {
-                        TraceLog(LOG_WARNING, "Instruction F-65");
+                        //TraceLog(LOG_WARNING, "Instruction F-65");
                         Opcode_FX65();
                     } break;
 
@@ -752,65 +736,19 @@ int main(int ArgCount, char **ArgValues)
 
         int32 RectSize = 30;
         DrawText("Registers", PosX + 10, 10, 14, BLACK);
-#if 0
-        for(int32 Y = 0; Y < ArrayCount(Registers); Y++)
-        {
-            int32 MinY = Y * RectSize;
-            int32 MaxY = MinY + RectSize;
-            DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        }
-        int32 Y = 0;
-        int32 MinY = Y * RectSize;
-        int32 MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-        Y++;
-        MinY = Y * RectSize;
-        MaxY = MinY + RectSize;
-        DrawRectangleLines(PosX, MinY, WINDOW_WIDTH, MaxY, BLUE);
-#endif
 
         // Bottom Area
         DrawRectangle(0, DISPLAY_HEIGHT*PixelSize, DISPLAY_WIDTH*PixelSize, WINDOW_HEIGHT, Color{255, 0, 255, 100});
+
+        if(DelayTimer > 0)
+        {
+            DelayTimer--;
+        }
+
+        if(SoundTimer > 0)
+        {
+            SoundTimer--;
+        }
 
         ClearBackground(RAYWHITE);
 
