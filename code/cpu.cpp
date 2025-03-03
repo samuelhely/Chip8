@@ -107,7 +107,7 @@ static void KeyPress(cpu *CPU, uint8 *Keypad, uint8 VX, uint8 NN)
     {
         case 0x9E :
         {
-            if(Keypad[CPU->Registers[VX]] == 1)
+            if(Keypad[CPU->Registers[VX]])
             {
                 CPU->ProgramCounter += 2;
             }
@@ -115,7 +115,7 @@ static void KeyPress(cpu *CPU, uint8 *Keypad, uint8 VX, uint8 NN)
 
         case 0xA1 :
         {
-            if(Keypad[CPU->Registers[VX]] == 0)
+            if(!Keypad[CPU->Registers[VX]])
             {
                 CPU->ProgramCounter += 2;
             }
@@ -136,7 +136,7 @@ static void Misc(cpu *CPU, chip8 *Chip8, memory *Memory, uint8 VX, uint8 NN)
         {
             for(uint8 KeypadIndex = 0; KeypadIndex < KEYPAD_SIZE; KeypadIndex++)
             {
-                if(Chip8->Keypad[KeypadIndex] == 1)
+                if(Chip8->Keypad[KeypadIndex])
                 {
                     CPU->Registers[VX] = KeypadIndex;
                     return;
@@ -169,7 +169,8 @@ static void Misc(cpu *CPU, chip8 *Chip8, memory *Memory, uint8 VX, uint8 NN)
 
         case 0x29 :
         {
-            CPU->IndexRegister = (uint8)(FONT_ADDRESS + CPU->Registers[VX]);
+            uint8 FontSize = 5;
+            CPU->IndexRegister = (uint8)(FONT_ADDRESS + CPU->Registers[VX]*FontSize);
         } break;
 
         case 0x33 :

@@ -30,6 +30,12 @@ typedef double real64;
 #define PC_START_ADDRESS 0x200
 #define FONT_ADDRESS 0x50
 
+struct key
+{
+    int32 Value;
+    bool32 IsPressed;;
+};
+
 struct chip8
 {
     uint16 Stack[STACK_SIZE];
