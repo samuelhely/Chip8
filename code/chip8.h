@@ -52,6 +52,8 @@ struct memory
     uint8 Address;
 };
 
+real32 tSine = 0.0f;
+
 static void InitEmulator(chip8 *Chip8, memory *Memory);
 
 static uint8 ReadMemory(memory *Memory, uint32 Address);

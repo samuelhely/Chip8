@@ -78,19 +78,29 @@ static void InitEmulator(chip8 *Chip8, memory *Memory)
 
     WriteToMemory(Memory, Font, ArrayCount(Font), FONT_ADDRESS);
 }
-
-void PlaySound()
+    
+void InputAudioCallback(void *Buffer, uint32 Frames)
 {
-    Wave WaveData = LoadWave("sound/Beep.wav");
-    if(IsWaveValid(WaveData))
+    uint16 *Data = (uint16*)Buffer;
+
+    int32 ToneHz = 256;
+    int32 WavePeriod = 48000 / ToneHz;
+
+    for(uint32 Index = 0; Index < Frames; Index++)
     {
-        Sound SoundData = LoadSoundFromWave(WaveData);
-        if(IsSoundValid(SoundData))
+        real32 SineValue = sinf(tSine);
+        int16 SampleValue = (int16)(SineValue*2000);
+
+        *Data++ = SampleValue;
+        *Data++ = SampleValue;
+
+        tSine += 2.0f*PI*1.0f/(real32)WavePeriod;
+        if(tSine > 2.0f*PI)
         {
-            PlaySound(SoundData);
-            //StopSound(SoundData);
+            tSine -= 2.0f*PI;
         }
     }
+
 }
 
 int main(int ArgCount, char **ArgValues)
@@ -115,9 +125,12 @@ int main(int ArgCount, char **ArgValues)
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Chip8");
     
     InitAudioDevice();
+    AudioStream Stream = {};
     if(IsAudioDeviceReady())
     {
-        SetMasterVolume(50.0f);
+        Stream = LoadAudioStream(44100, 16, 2);
+        SetAudioStreamBufferSizeDefault(4096);
+        SetAudioStreamCallback(Stream, InputAudioCallback);
     }
 
     real32 AccumulatorRenderTime = 0.0f;
@@ -162,14 +175,6 @@ int main(int ArgCount, char **ArgValues)
                 Cycle(&CPU, &Chip8, &Memory);
             }
 
-            for(uint8 KeyIndex = 0; KeyIndex < KEYPAD_SIZE; KeyIndex++)
-            {
-                if(Chip8.Keypad[KeyIndex])
-                {
-                    TraceLog(LOG_WARNING, "Key %d is pressed", KeyIndex);
-                }
-            }
-
             if(Chip8.DelayTimer > 0)
             {
                 Chip8.DelayTimer--;
@@ -178,7 +183,12 @@ int main(int ArgCount, char **ArgValues)
             if(Chip8.SoundTimer > 0)
             {
                 Chip8.SoundTimer--;
-                PlaySound();
+                PlayAudioStream(Stream);
+            }
+            else
+            {
+                IsAudioStreamPlaying(Stream);
+                StopAudioStream(Stream);
             }
 
             int32 PixelSize = 10;
